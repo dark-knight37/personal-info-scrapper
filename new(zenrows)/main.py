@@ -3,6 +3,7 @@ import re
 import openpyxl
 from zenrows import ZenRowsClient
 from bs4 import BeautifulSoup
+import asyncio
 
 zenrows_key = ""
 
@@ -58,7 +59,7 @@ def build_url(data, entity_type, owner_num):
     return search_url
 
 
-def scrap(data, client, params):
+async def scrap(data, client, params):
     age_regex = re.compile(r'Age \d+ \([A-Za-z]{3} \d+\)')
 
     first_name = data["Owner name 01"]
@@ -70,7 +71,7 @@ def scrap(data, client, params):
     print(first_name)
     print(search_url)
 
-    response = client.get(search_url, params=params)
+    response = await client.get_async(search_url, params=params)
 
     soup = BeautifulSoup(response.text, 'html.parser')
     a_tag = soup.find('a', {'class': 'btn btn-success btn-lg detail-link shadow-form'})
@@ -80,7 +81,7 @@ def scrap(data, client, params):
 
         print(detail_url)
 
-        detail_response = client.get(detail_url, params=params)
+        detail_response = await client.get_async(detail_url, params=params)
 
         with open("html.txt", "w", encoding="UTF-8") as output:
             output.write(detail_response.text)
@@ -91,8 +92,11 @@ def scrap(data, client, params):
         if entity_type:
             data["Entity Owner's Name (Only if ENTITY)"] = owner.text
         
-        age_span_1 = detail_soup.find('span', string=age_regex)    
-        data["Age1"] = age_span_1.text.strip()
+        try:
+            age_span_1 = detail_soup.find('span', string=age_regex)    
+            data["Age1"] = age_span_1.text.strip()
+        except:
+            data["Age1"] = "Age Unknown"
         
         phone_numbers_1 = []
         phone_divs = detail_soup.select('div.row div.col-12')
@@ -133,7 +137,7 @@ def scrap(data, client, params):
     except:
         print("Cannot Fine Detail Link")
         with open("error.txt", "a", encoding="UTF-8") as error:
-            error.write(first_name)
+            error.write(first_name + "\n")
 
 
     second_name = data["Owner name 02"]
@@ -146,7 +150,7 @@ def scrap(data, client, params):
         print(second_name)
         print(search_url)
 
-        response = client.get(search_url, params=params)
+        response = await client.get_async(search_url, params=params)
         soup = BeautifulSoup(response.text, 'html.parser')
 
         a_tag = soup.find('a', {'class': 'btn btn-success btn-lg detail-link shadow-form'})
@@ -156,12 +160,15 @@ def scrap(data, client, params):
 
             print(detail_url)
 
-            detail_response = client.get(detail_url, params=params)
+            detail_response = await client.get_async(detail_url, params=params)
 
             detail_soup = BeautifulSoup(detail_response.text, 'html.parser')
         
-            age_span_2 = detail_soup.find('span', string=age_regex)    
-            data["Age2"] = age_span_2.text.strip()
+            try:
+                age_span_2 = detail_soup.find('span', string=age_regex)    
+                data["Age2"] = age_span_2.text.strip()
+            except:
+                data["Age2"] = "Age Unknown"
 
             phone_numbers_2 = []
             phone_divs = detail_soup.select('div.row div.col-12')
@@ -202,12 +209,12 @@ def scrap(data, client, params):
         except:
             print("Cannot Fine Detail Link")
             with open("error.txt", "a", encoding="UTF-8") as error:
-                error.write(second_name)        
+                error.write(second_name + "\n")
 
     return data
 
-if __name__ == "__main__":
-    client = ZenRowsClient(zenrows_key)
+async def main():
+    client = ZenRowsClient(zenrows_key, concurrency=10, retries=1)
     params = {"js_render":"true","antibot":"false","premium_proxy":"true"}
 
     input_file = 'Upwork Test LLCs.xlsx'
@@ -215,13 +222,21 @@ if __name__ == "__main__":
     
     output_data = []
 
-    input_temp = input_data[:5]
+    input_temp = input_data[:20]
 
-    for item in input_temp:
-        start_time = time.time()
-        data = scrap(item, client, params)
-        end_time = time.time()
-        print(end_time - start_time)
-        output_data.append(data)
+    tasks = [scrap(item, client, params) for item in input_temp]
+    output_data = await asyncio.gather(*tasks)
+    # for item in input_temp:
+    #     start_time = time.time()
+    #     data = scrap(item, client, params)
+    #     end_time = time.time()
+    #     print(end_time - start_time)
+    #     output_data.append(data)
 
     write_xlsx("result.xlsx", output_data)
+
+if __name__ == "__main__":
+    start_time = time.time()
+    asyncio.run(main())
+    end_time = time.time()
+    print("total time", end_time - start_time)
