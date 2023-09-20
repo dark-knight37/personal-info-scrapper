@@ -24,6 +24,18 @@ def read_xlsx(file):
                 keys.append(cell.value)
     return data
 
+def write_xlsx(file, data):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    for col, key in enumerate(data[0].keys(), start=1):
+        ws.cell(row=1, column=col, value=key)
+
+    for row, item in enumerate(data, start=2):
+        for col, value in enumerate(item.values(), start=1):
+            ws.cell(row=row, column=col, value=value)
+    
+    wb.save(file)
+
 def check_entity(name):
     if "Corp" in name or "LLC" in name or "LP" in name:
         return 1
@@ -54,7 +66,7 @@ def scrap(data, client, params):
 
     search_url = build_url(data, entity_type, 1)
 
-    print("\n\n")
+    print("\n")
     print(first_name)
     print(search_url)
 
@@ -77,7 +89,7 @@ def scrap(data, client, params):
         
         owner = detail_soup.select_one('h1.oh1')
         if entity_type:
-            data["Entity Owner's Name (Only if ENTITY)"] = owner
+            data["Entity Owner's Name (Only if ENTITY)"] = owner.text
         
         age_span_1 = detail_soup.find('span', string=age_regex)    
         data["Age1"] = age_span_1.text.strip()
@@ -203,17 +215,13 @@ if __name__ == "__main__":
     
     output_data = []
 
-    input_temp = input_data[8:9]
+    input_temp = input_data[:5]
 
     for item in input_temp:
-        print(item)
         start_time = time.time()
         data = scrap(item, client, params)
-        print(data)
         end_time = time.time()
         print(end_time - start_time)
-    # output_data.append(item)
+        output_data.append(data)
 
-
-
-    # print(response.text)
+    write_xlsx("result.xlsx", output_data)
