@@ -38,7 +38,7 @@ def write_xlsx(file, data):
     wb.save(file)
 
 def check_entity(name):
-    if "Corp" in name or "LLC" in name or "LP" in name:
+    if "CORP" in name or "LLC" in name or "LP" in name or "PC" in name or "CORPORATION" in name or "LLP" in name or "TRUST" in name or "REALTY" in name:
         return 1
     else:
         return 0
@@ -63,9 +63,9 @@ async def scrap(data, client, params):
     age_regex = re.compile(r'Age \d+ \([A-Za-z]{3} \d+\)')
 
     first_name = data["Owner name 01"]
-    entity_type = check_entity(first_name)
+    entity_type_1 = check_entity(first_name)
 
-    search_url = build_url(data, entity_type, 1)
+    search_url = build_url(data, entity_type_1, 1)
 
     print("\n")
     print(first_name)
@@ -89,7 +89,7 @@ async def scrap(data, client, params):
         detail_soup = BeautifulSoup(detail_response.text, 'html.parser')
         
         owner = detail_soup.select_one('h1.oh1')
-        if entity_type:
+        if entity_type_1:
             data["Entity Owner's Name (Only if ENTITY)"] = owner.text
         
         try:
@@ -139,77 +139,79 @@ async def scrap(data, client, params):
         with open("error.txt", "a", encoding="UTF-8") as error:
             error.write(first_name + "\n")
 
-
-    second_name = data["Owner name 02"]
+    second_name = data["Owner name 02"]    
+        
     if second_name:
-        entity_type = check_entity(second_name)
-        
-        search_url = build_url(data, entity_type, 2)
+        entity_type_2 = check_entity(second_name)
+        if entity_type_1 == 1 and entity_type_2 == 1:
+            pass
+        else:
+            search_url = build_url(data, entity_type_2, 2)
 
-        print("\n\n")
-        print(second_name)
-        print(search_url)
+            print("\n\n")
+            print(second_name)
+            print(search_url)
 
-        response = await client.get_async(search_url, params=params)
-        soup = BeautifulSoup(response.text, 'html.parser')
+            response = await client.get_async(search_url, params=params)
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-        a_tag = soup.find('a', {'class': 'btn btn-success btn-lg detail-link shadow-form'})
+            a_tag = soup.find('a', {'class': 'btn btn-success btn-lg detail-link shadow-form'})
 
-        try:
-            detail_url = "https://www.truepeoplesearch.com" + a_tag['href']
-
-            print(detail_url)
-
-            detail_response = await client.get_async(detail_url, params=params)
-
-            detail_soup = BeautifulSoup(detail_response.text, 'html.parser')
-        
             try:
-                age_span_2 = detail_soup.find('span', string=age_regex)    
-                data["Age2"] = age_span_2.text.strip()
-            except:
-                data["Age2"] = "Age Unknown"
+                detail_url = "https://www.truepeoplesearch.com" + a_tag['href']
 
-            phone_numbers_2 = []
-            phone_divs = detail_soup.select('div.row div.col-12')
-            for phone_div in phone_divs:
+                print(detail_url)
+
+                detail_response = await client.get_async(detail_url, params=params)
+
+                detail_soup = BeautifulSoup(detail_response.text, 'html.parser')
+            
                 try:
-                    phone_span = phone_div.select_one('a[data-link-to-more="phone"] span[itemprop="telephone"]')
-                    phone = phone_span.text.strip()
-
-                    phone_type_span = phone_div.select_one('span.smaller')
-                    phone_type = phone_type_span.text.strip()
-
-                    phone_info = f"{phone} - {phone_type}"
-                    if phone_info not in phone_numbers_2:
-                        phone_numbers_2.append(phone_info)
+                    age_span_2 = detail_soup.find('span', string=age_regex)    
+                    data["Age2"] = age_span_2.text.strip()
                 except:
-                    pass
-            i = 1
-            while len(phone_numbers_2):
-                phone = phone_numbers_2.pop(0)
-                if i < 7:
-                    data["Phone2-"+str(i)] = phone
-                    i += 1
+                    data["Age2"] = "Age Unknown"
 
-            emails_2 = []
-            email_divs = detail_soup.select('.col > div:last-child')
-            for email_div in email_divs:
-                text = email_div.text.strip()
-                if re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text):
-                    if text != "support@truepeoplesearch.com" and text not in emails_2:
-                        emails_2.append(text)
+                phone_numbers_2 = []
+                phone_divs = detail_soup.select('div.row div.col-12')
+                for phone_div in phone_divs:
+                    try:
+                        phone_span = phone_div.select_one('a[data-link-to-more="phone"] span[itemprop="telephone"]')
+                        phone = phone_span.text.strip()
 
-            j = 1
-            while len(emails_2):
-                email = emails_2.pop(0)
-                if j < 3:
-                    data["Email2-"+str(j)] = email
-                    j += 1
-        except:
-            print("Cannot Fine Detail Link")
-            with open("error.txt", "a", encoding="UTF-8") as error:
-                error.write(second_name + "\n")
+                        phone_type_span = phone_div.select_one('span.smaller')
+                        phone_type = phone_type_span.text.strip()
+
+                        phone_info = f"{phone} - {phone_type}"
+                        if phone_info not in phone_numbers_2:
+                            phone_numbers_2.append(phone_info)
+                    except:
+                        pass
+                i = 1
+                while len(phone_numbers_2):
+                    phone = phone_numbers_2.pop(0)
+                    if i < 7:
+                        data["Phone2-"+str(i)] = phone
+                        i += 1
+
+                emails_2 = []
+                email_divs = detail_soup.select('.col > div:last-child')
+                for email_div in email_divs:
+                    text = email_div.text.strip()
+                    if re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text):
+                        if text != "support@truepeoplesearch.com" and text not in emails_2:
+                            emails_2.append(text)
+
+                j = 1
+                while len(emails_2):
+                    email = emails_2.pop(0)
+                    if j < 3:
+                        data["Email2-"+str(j)] = email
+                        j += 1
+            except:
+                print("Cannot Fine Detail Link")
+                with open("error.txt", "a", encoding="UTF-8") as error:
+                    error.write(second_name + "\n")
 
     return data
 
